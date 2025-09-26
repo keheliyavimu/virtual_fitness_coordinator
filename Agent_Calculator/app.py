@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 import requests
 
-app = Flask(__name__)
+app = Flask(__name__) #app
 
 # The URL of the Leaderboard Manager Agent (Agent 3)
 LEADERBOARD_AGENT_URL = "http://127.0.0.1:5001/api/update"
