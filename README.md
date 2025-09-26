@@ -47,4 +47,4 @@ The system is composed of three independent microservices (agents) that communic
 ## 👥 Contributors
 
 -   [Chathuranga K.K.K.V.](https://github.com/keheliyavimu)
--   [Group Member 2 Name](https://github.com/member2-username)
+-   [Senaratne H.S.](https://github.com/HSSenaratne)  
