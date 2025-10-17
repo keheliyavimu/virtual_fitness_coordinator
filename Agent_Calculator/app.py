@@ -4,10 +4,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import os, re, json
 
-# -------------------------------------------------------------------
-# Flask App Initialization
-# -------------------------------------------------------------------
-app = Flask(__name__)
+app = Flask(__name__) #app
 
 # Load environment variables
 load_dotenv()
