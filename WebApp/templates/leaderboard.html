@@ -11,16 +11,18 @@
             </tr>
         </thead>
         <tbody>
-            {% for entry in leaderboard %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ entry.username }}</td>
-                <td>{{ entry.score }}</td>
-            </tr>
+            {% if leaderboard %}
+                {% for entry in leaderboard %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ entry.user_id }}</td>
+                    <td>{{ entry.score }}</td>
+                </tr>
+                {% endfor %}
             {% else %}
-            <tr><td colspan="3">No leaderboard data yet.</td></tr>
-            {% endfor %}
+                <tr><td colspan="3">No leaderboard data yet.</td></tr>
+            {% endif %}
         </tbody>
     </table>
 </div>
-{% endblock %}
+{% endblock %}

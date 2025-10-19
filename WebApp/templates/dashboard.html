@@ -100,8 +100,12 @@
           <h4 class="competition-title">{{ competition.name }}</h4>
           <p class="competition-desc">{{ competition.description }}</p>
           <div class="competition-actions">
-            <a href="{{ url_for('leaderboard', id=competition['_id']) }}" class="btn btn-leaderboard">Leaderboard</a>
-            <a href="{{ url_for('messages', id=competition['_id']) }}" class="btn btn-messages">Messages</a>
+            <a href="{{ url_for('leaderboard_page', competition_id=competition['_id']) }}" 
+            class="btn btn-leaderboard">Leaderboard</a>
+
+          <a href="{{ url_for('messages', id=competition['_id']) }}" 
+            class="btn btn-messages">Messages</a>
+
           </div>
         </div>
         {% endfor %}

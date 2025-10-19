@@ -4,21 +4,20 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import os, re, json
 
-app = Flask(__name__) #app
+app = Flask(__name__)
 
-# Load environment variables
+# -------------------------------------------------------------
+# Load environment variables and configure Gemini
+# -------------------------------------------------------------
 load_dotenv()
-
-# Configure Gemini API
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # URL for Leaderboard Agent
 LEADERBOARD_AGENT_URL = "http://127.0.0.1:5001/api/update"
 
-
-# -------------------------------------------------------------------
+# -------------------------------------------------------------
 # Function: AI Scoring using Gemini
-# -------------------------------------------------------------------
+# -------------------------------------------------------------
 def calculate_score_with_ai(activity_data):
     prompt = f"""
     You are a fitness scoring assistant. Based on the user's description below, 
@@ -52,42 +51,52 @@ def calculate_score_with_ai(activity_data):
         raw_text = response.text.strip()
         print(f"🤖 RAW GEMINI RESPONSE: {raw_text}")
 
-        # Extract JSON safely from Gemini output
+        # Extract JSON safely
         match = re.search(r'\{.*\}', raw_text, re.DOTALL)
         if match:
             result = json.loads(match.group(0))
+            print(f"✅ Parsed AI result: {result}")
             return result
         else:
+            print("⚠ No valid JSON found in AI response")
             return {"score": 0, "reason": "Invalid AI output format"}
 
     except Exception as e:
         print(f"❌ AI Error: {e}")
         return {"score": 0, "reason": f"AI system error: {str(e)}"}
 
-
-# -------------------------------------------------------------------
+# -------------------------------------------------------------
 # Flask Route: Calculate Score
-# -------------------------------------------------------------------
+# -------------------------------------------------------------
 @app.route('/api/calculate', methods=['POST'])
 def calculate():
     data = request.get_json()
     user_id = data.get('user_id')
     activity_data = data.get('activity_data')
+    competition_id = data.get('competition_id')  # <-- NEW
 
-    if not user_id or not activity_data:
-        return jsonify({"error": "Missing user_id or activity_data"}), 400
+    if not user_id or not activity_data or not competition_id:
+        return jsonify({"error": "Missing user_id, activity_data, or competition_id"}), 400
 
     print(f"🧠 Calculating score for {user_id}: {activity_data}")
 
-    # Use AI to calculate the score
     ai_result = calculate_score_with_ai(activity_data)
     score = ai_result.get("score", 0)
     reason = ai_result.get("reason", "No reason provided")
 
-    # Send the score to Leaderboard Agent
+    # Send score to Leaderboard Agent
     try:
-        payload = {"user_id": user_id, "score": score}
+        payload = {
+            "user_id": user_id,
+            "score": score,
+            "competition_id": competition_id  # <-- MUST include
+        }
+        print("📤 Sending to leaderboard:", payload)
+
         response = requests.post(LEADERBOARD_AGENT_URL, json=payload)
+        print("📥 Response code:", response.status_code)
+        print("📥 Response text:", response.text)
+
         response.raise_for_status()
 
         return jsonify({
@@ -97,12 +106,11 @@ def calculate():
         }), 200
 
     except requests.exceptions.RequestException as e:
-        print(f"⚠ Communication error: {e}")
+        print(f"⚠ Communication error with leaderboard: {e}")
         return jsonify({"error": f"Failed to send data to leaderboard agent: {e}"}), 500
 
-
-# -------------------------------------------------------------------
+# -------------------------------------------------------------
 # Run Flask App
-# -------------------------------------------------------------------
+# -------------------------------------------------------------
 if __name__ == '__main__':
-    app.run(debug=True,port=5002)
+    app.run(debug=True, port=5002)

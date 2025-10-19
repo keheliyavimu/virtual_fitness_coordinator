@@ -172,3 +172,36 @@ body {
   .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
+
+#message-input {
+  width: 100%;
+  min-height: 100px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #D1D5DB;
+  margin-bottom: 8px;
+  font-size: 1rem;
+  resize: vertical;
+}
+
+.btn-send {
+  background-color: #3B82F6;
+  color: #fff;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-send:hover { background-color: #2563EB; transform: translateY(-2px); }
+
+.feedback { margin-top: 8px; font-weight: 600; }
+.feedback.success { color: #10B981; }
+.feedback.error { color: #EF4444; }
+
+.message-list { list-style: none; padding-left: 0; }
+.message-list li { padding: 8px 0; border-bottom: 1px solid #E5E7EB; }
+.msg-time { color: #6B7280; font-size: 0.85rem; margin-left: 8px; }
+

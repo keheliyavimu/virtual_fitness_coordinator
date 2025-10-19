@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from pymongo import MongoClient
@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 import os
 
+LEADERBOARD_API = "http://127.0.0.1:5001/api/leaderboard"
 # --- Load environment variables ---
 load_dotenv()
 
@@ -194,50 +195,64 @@ def enroll_competition(competition_id):
 # -------------------
 # MESSAGES & LEADERBOARD
 # -------------------
+@app.route("/leaderboard/<competition_id>")
+@login_required
+def leaderboard_page(competition_id):
+    try:
+        response = requests.get(f"{LEADERBOARD_API}/{competition_id}")
+        if response.status_code == 200:
+            data = response.json().get("leaderboard", [])
+            return render_template("leaderboard.html", leaderboard=data)
+        else:
+            print(f"⚠️ Failed to fetch leaderboard. Status code: {response.status_code}")
+            return render_template("leaderboard.html", leaderboard=[])
+    except Exception as e:
+        print(f"❌ Error fetching leaderboard: {e}")
+        return render_template("leaderboard.html", leaderboard=[])
 
-@app.route("/competition/<id>/messages", methods=["GET", "POST"])
+
+@app.route("/messages/<id>", methods=["GET", "POST"])
 @login_required
 def messages(id):
+    # Only enrolled users or admin can access
     enrollment = db.enrollments.find_one({"user_id": current_user.id, "competition_id": id})
     if not enrollment and current_user.role != "admin":
         flash("Access denied", "danger")
         return redirect(url_for("user_dashboard"))
 
     if request.method == "POST":
-        msg = request.form["message"]
+        data = request.get_json()
+        msg = data.get("message")
+        user_id = data.get("user_id")
+
+        if not msg:
+            return jsonify({"error": "Message cannot be empty."}), 400
+
+        # Insert message into DB
         db.messages.insert_one({
             "competition_id": id,
-            "user_id": current_user.id,
+            "user_id": user_id,
             "username": current_user.username,
             "content": msg,
             "timestamp": datetime.utcnow()
         })
-        score = len(msg) % 10 + 50
-        lb_entry = db.leaderboards.find_one({"user_id": current_user.id, "competition_id": id})
-        if lb_entry:
-            db.leaderboards.update_one({"_id": lb_entry["_id"]}, {"$set": {"score": score, "updated_at": datetime.utcnow()}})
-        else:
-            db.leaderboards.insert_one({
-                "user_id": current_user.id,
-                "competition_id": id,
-                "username": current_user.username,
-                "score": score,
-                "updated_at": datetime.utcnow()
-            })
-        flash("Message sent and score updated!", "success")
-        return redirect(url_for("messages", id=id))
 
-    all_messages = list(db.messages.find({"competition_id": id}))
+        # -----------------------------
+        # Forward to Validation Agent
+        # -----------------------------
+        import requests
+        validation_payload = {"user_id": user_id, "activity_data": msg}
+        try:
+            val_response = requests.post("http://127.0.0.1:5005/api/submit", json=validation_payload)
+            val_response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            return jsonify({"error": f"Validation failed: {e}"}), 500
+
+        return jsonify({"success": True}), 200
+
+    all_messages = list(db.messages.find({"competition_id": id}).sort("timestamp", 1))
     return render_template("messages.html", messages=all_messages, competition_id=id)
 
-@app.route("/leaderboard/<id>")
-@login_required
-def leaderboard(id):
-    if current_user.role == "admin":
-        leaders = list(db.leaderboards.find({"competition_id": id}))
-    else:
-        leaders = list(db.leaderboards.find({"competition_id": id, "user_id": current_user.id}))
-    return render_template("leaderboard.html", leaders=leaders)
 
 # -------------------
 # RUN APP
