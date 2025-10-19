@@ -8,15 +8,25 @@
   </p>
 
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
-    <a href="{{ url_for('competitions') }}" class="bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded-lg shadow text-center">
+    <a href="{{ url_for('competition_form') }}" class="bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded-lg shadow text-center">
       🏆 View Competitions
     </a>
-    <a href="{{ url_for('leaderboard') }}" class="bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg shadow text-center">
-      📊 Leaderboard
-    </a>
-    <a href="{{ url_for('messages') }}" class="bg-purple-500 hover:bg-purple-600 text-white py-3 px-4 rounded-lg shadow text-center">
-      💬 Messages
+{% for competition in competitions %}
+  <div class="competition-card">
+    <h3>{{ competition.name }}</h3>
+    <p>{{ competition.description }}</p>
+    <a href="{{ url_for('leaderboard', id=competition['_id']) }}"
+       class="bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg shadow text-center">
+       View Leaderboard
     </a>
   </div>
+{% endfor %}
+{% for competition in competitions %}
+  <a href="{{ url_for('messages', id=competition['_id']) }}"
+     class="bg-purple-500 hover:bg-purple-600 text-white py-3 px-4 rounded-lg shadow text-center">
+     💬 Messages
+  </a>
+{% endfor %}
+  </div>
 </div>
-{% endblock %}
+{% endblock %}

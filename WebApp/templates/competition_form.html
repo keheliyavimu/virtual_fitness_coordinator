@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="form-container">
+    <h2>Join Competition</h2>
+    <form method="POST">
+        <label>Competition Name</label>
+        <input type="text" name="competition_name" value="{{ competition['name'] }}" readonly>
+
+        <label>Your Team Name</label>
+        <input type="text" name="team_name" placeholder="Enter your team name" required>
+
+        <label>Motivation / Notes</label>
+        <textarea name="notes" placeholder="Why do you want to participate?" rows="3"></textarea>
+
+        <button type="submit" class="btn">Submit Entry</button>
+    </form>
+</div>
+{% endblock %}
