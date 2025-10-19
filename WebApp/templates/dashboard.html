@@ -1,32 +1,116 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
-{% block content %}
-<div class="max-w-4xl mx-auto mt-10 bg-white p-6 rounded-xl shadow">
-  <h2 class="text-2xl font-semibold text-gray-800 mb-4">Welcome, {{ session['username'] }}!</h2>
-  <p class="text-gray-600 mb-6">
-    This is your personalized dashboard. From here you can view competitions, submit activities, and check messages.
-  </p>
 
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
-    <a href="{{ url_for('competition_form') }}" class="bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded-lg shadow text-center">
-      🏆 View Competitions
-    </a>
-{% for competition in competitions %}
-  <div class="competition-card">
-    <h3>{{ competition.name }}</h3>
-    <p>{{ competition.description }}</p>
-    <a href="{{ url_for('leaderboard', id=competition['_id']) }}"
-       class="bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg shadow text-center">
-       View Leaderboard
-    </a>
-  </div>
-{% endfor %}
-{% for competition in competitions %}
-  <a href="{{ url_for('messages', id=competition['_id']) }}"
-     class="bg-purple-500 hover:bg-purple-600 text-white py-3 px-4 rounded-lg shadow text-center">
-     💬 Messages
-  </a>
-{% endfor %}
-  </div>
+{% block content %}
+<div class="dashboard-container">
+  <h2 class="dashboard-title">Welcome, {{ current_user.username }}!</h2>
+
+  {% if role == "admin" %}
+    <p class="dashboard-subtitle">
+      This is your admin dashboard. You can manage users, competitions, view leaderboards, and messages.
+    </p>
+
+    <!-- Users Table -->
+    <div class="card mb-8">
+      <h3 class="card-title">Users</h3>
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+          <tr>
+            <td>{{ user.username }}</td>
+            <td>{{ user.role }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Competitions Table -->
+    <div class="card mb-8">
+      <h3 class="card-title">Competitions</h3>
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for competition in competitions %}
+          <tr>
+            <td>{{ competition.name }}</td>
+            <td>{{ competition.description }}</td>
+            <td>
+              <a href="{{ url_for('edit_competition', id=competition['_id']) }}" class="btn btn-edit">Edit</a>
+              <form method="POST" action="{{ url_for('delete_competition', id=competition['_id']) }}" class="inline-form">
+                <button type="submit" class="btn btn-delete">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <a href="{{ url_for('competition_form') }}" class="btn btn-add">➕ Add New Competition</a>
+    </div>
+
+  {% else %}
+    <p class="dashboard-subtitle">
+      This is your dashboard. You can view competitions, your enrolled competitions, leaderboards, and messages.
+    </p>
+
+    <!-- Available Competitions -->
+    <div class="card mb-8">
+      <h3 class="card-title">Available Competitions</h3>
+      {% if competitions %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for competition in competitions %}
+        <div class="competition-card">
+          <h4 class="competition-title">{{ competition.name }}</h4>
+          <p class="competition-desc">{{ competition.description }}</p>
+          {% if competition['_id'] not in enrolled_ids %}
+          <form method="POST" action="{{ url_for('enroll_competition', competition_id=competition['_id']) }}">
+            <button type="submit" class="btn btn-enroll">Enroll</button>
+          </form>
+          {% else %}
+          <span class="enrolled-label">Enrolled</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        <p>No competitions available currently.</p>
+      {% endif %}
+    </div>
+
+    <!-- Enrolled Competitions -->
+    <div class="card mb-8">
+      <h3 class="card-title">Your Enrolled Competitions</h3>
+      {% if enrolled_competitions %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for competition in enrolled_competitions %}
+        <div class="competition-card">
+          <h4 class="competition-title">{{ competition.name }}</h4>
+          <p class="competition-desc">{{ competition.description }}</p>
+          <div class="competition-actions">
+            <a href="{{ url_for('leaderboard', id=competition['_id']) }}" class="btn btn-leaderboard">Leaderboard</a>
+            <a href="{{ url_for('messages', id=competition['_id']) }}" class="btn btn-messages">Messages</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        <p>You are not enrolled in any competitions yet.</p>
+      {% endif %}
+    </div>
+
+  {% endif %}
 </div>
 {% endblock %}
