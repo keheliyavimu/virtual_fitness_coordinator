@@ -5,15 +5,17 @@
 <div class="dashboard-container">
   <h2 class="dashboard-title">Messages for Competition</h2>
 
+  <!-- Send Message -->
   <div class="card mb-6">
     <h3 class="card-title">Send a Message</h3>
     <form id="message-form">
       <textarea id="message-input" placeholder="Type your message..." required></textarea>
       <button type="submit" class="btn btn-send">Send</button>
     </form>
-    <div id="form-feedback" class="feedback"></div>
+    <div id="form-feedback" class="feedback" style="margin-top:10px;"></div>
   </div>
 
+  <!-- Previous Messages -->
   <div class="card">
     <h3 class="card-title">Previous Messages</h3>
     {% if messages %}
@@ -32,40 +34,50 @@
 </div>
 
 <script>
-document.getElementById("message-form").addEventListener("submit", async function(e){
-    e.preventDefault();
+document.getElementById("message-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
 
-    const message = document.getElementById("message-input").value.trim();
-    const competition_id = "{{ competition_id }}";
-    const user_id = "{{ current_user.id }}";
+  const messageInput = document.getElementById("message-input");
+  const feedback = document.getElementById("form-feedback");
+  const message = messageInput.value.trim();
+  const userId = "{{ current_user.id }}";
+  const competitionId = "{{ competition_id }}";
 
-    if(!message) return;
+  if (!message) return;
 
-    try {
-        const response = await fetch(`/messages/${competition_id}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message, user_id })
-        });
+  feedback.innerHTML = "⏳ Processing your activity...";
+  feedback.style.color = "#777";
 
-        const result = await response.json();
-        const feedback = document.getElementById("form-feedback");
+  try {
+    const response = await fetch(`/messages/${competitionId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: message,
+        user_id: userId
+      })
+    });
 
-        if(response.ok){
-            feedback.innerText = "Message sent and score updated!";
-            feedback.className = "feedback success";
-            document.getElementById("message-input").value = "";
-            setTimeout(()=> location.reload(), 1000); // reload to show new message
-        } else {
-            feedback.innerText = result.error || result.errors.join(", ");
-            feedback.className = "feedback error";
-        }
-    } catch(err){
-        console.error(err);
-        const feedback = document.getElementById("form-feedback");
-        feedback.innerText = "System error. Try again later.";
-        feedback.className = "feedback error";
+    if (response.ok) {
+      feedback.innerHTML = "✅ Activity recorded and leaderboard updated!";
+      feedback.style.color = "green";
+      messageInput.value = "";
+
+      // Optional: reload to show updated messages or redirect to leaderboard
+      setTimeout(() => {
+        location.reload();
+        // or window.location.href = `/leaderboard/${competitionId}`;
+      }, 1000);
+    } else {
+      const data = await response.json();
+      feedback.innerHTML = "❌ " + (data.error || "Something went wrong.");
+      feedback.style.color = "red";
     }
+  } catch (err) {
+    feedback.innerHTML = "⚠️ Network error. Try again later.";
+    feedback.style.color = "red";
+  }
 });
 </script>
+
 {% endblock %}

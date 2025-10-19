@@ -6,6 +6,7 @@ from bson import ObjectId
 from dotenv import load_dotenv
 from datetime import datetime
 import os
+import requests
 
 LEADERBOARD_API = "http://127.0.0.1:5001/api/leaderboard"
 # --- Load environment variables ---
@@ -42,7 +43,6 @@ def load_user(user_id):
 # -------------------
 # ROUTES
 # -------------------
-
 @app.route("/")
 def home():
     if current_user.is_authenticated:
@@ -55,7 +55,6 @@ def home():
 # -------------------
 # AUTH ROUTES
 # -------------------
-
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -106,7 +105,6 @@ def logout():
 # -------------------
 # ADMIN ROUTES
 # -------------------
-
 @app.route("/admin/dashboard")
 @login_required
 def admin_dashboard():
@@ -114,8 +112,11 @@ def admin_dashboard():
         flash("Access denied", "danger")
         return redirect(url_for("user_dashboard"))
 
+    # convert _id to string for template usage
     users = list(db.users.find())
     competitions = list(db.competitions.find())
+    for comp in competitions:
+        comp["_id"] = str(comp["_id"])
     return render_template("dashboard.html", users=users, competitions=competitions, role="admin")
 
 @app.route("/competition/new", methods=["GET", "POST"])
@@ -142,6 +143,8 @@ def edit_competition(id):
         return redirect(url_for("user_dashboard"))
 
     competition = db.competitions.find_one({"_id": ObjectId(id)})
+    if competition:
+        competition["_id"] = str(competition["_id"])
 
     if request.method == "POST":
         name = request.form.get("competition_name")
@@ -166,14 +169,29 @@ def delete_competition(id):
 # -------------------
 # USER ROUTES
 # -------------------
-
 @app.route("/user/dashboard")
 @login_required
 def user_dashboard():
     competitions = list(db.competitions.find())
+    # convert competition _id to string for template
+    for comp in competitions:
+        comp["_id"] = str(comp["_id"])
+
     enrolled = list(db.enrollments.find({"user_id": current_user.id}))
     enrolled_ids = [e["competition_id"] for e in enrolled]
-    enrolled_competitions = [db.competitions.find_one({"_id": ObjectId(cid)}) for cid in enrolled_ids]
+
+    # get competition docs for enrolled_ids, filter None
+    enrolled_competitions = []
+    for cid in enrolled_ids:
+        try:
+            comp_doc = db.competitions.find_one({"_id": ObjectId(cid)})
+            if comp_doc:
+                comp_doc["_id"] = str(comp_doc["_id"])
+                enrolled_competitions.append(comp_doc)
+        except Exception:
+            # skip invalid ids
+            continue
+
     return render_template("dashboard.html", competitions=competitions, enrolled_ids=enrolled_ids,
                            enrolled_competitions=enrolled_competitions, role="user")
 
@@ -199,7 +217,10 @@ def enroll_competition(competition_id):
 @login_required
 def leaderboard_page(competition_id):
     try:
+        print(f"📡 Fetching leaderboard for {competition_id} from {LEADERBOARD_API}")
         response = requests.get(f"{LEADERBOARD_API}/{competition_id}")
+        print(f"↩️ Status: {response.status_code}, Response: {response.text}")
+
         if response.status_code == 200:
             data = response.json().get("leaderboard", [])
             return render_template("leaderboard.html", leaderboard=data)
@@ -214,21 +235,26 @@ def leaderboard_page(competition_id):
 @app.route("/messages/<id>", methods=["GET", "POST"])
 @login_required
 def messages(id):
-    # Only enrolled users or admin can access
+    # Check if user is allowed
     enrollment = db.enrollments.find_one({"user_id": current_user.id, "competition_id": id})
     if not enrollment and current_user.role != "admin":
         flash("Access denied", "danger")
         return redirect(url_for("user_dashboard"))
 
     if request.method == "POST":
-        data = request.get_json()
-        msg = data.get("message")
-        user_id = data.get("user_id")
+        # Handle both JSON and form submissions
+        if request.is_json:
+            data = request.get_json()
+            msg = data.get("message")
+            user_id = data.get("user_id")
+        else:
+            msg = request.form.get("message")
+            user_id = request.form.get("user_id")
 
         if not msg:
             return jsonify({"error": "Message cannot be empty."}), 400
 
-        # Insert message into DB
+        # Save message
         db.messages.insert_one({
             "competition_id": id,
             "user_id": user_id,
@@ -237,25 +263,61 @@ def messages(id):
             "timestamp": datetime.utcnow()
         })
 
-        # -----------------------------
         # Forward to Validation Agent
-        # -----------------------------
-        import requests
-        validation_payload = {"user_id": user_id, "activity_data": msg}
+        validation_payload = {
+            "user_id": user_id,
+            "activity_data": msg,
+            "competition_id": id
+        }
+
         try:
             val_response = requests.post("http://127.0.0.1:5005/api/submit", json=validation_payload)
             val_response.raise_for_status()
         except requests.exceptions.RequestException as e:
-            return jsonify({"error": f"Validation failed: {e}"}), 500
+            print(f"❌ Validation failed: {e}")
+            flash("Validation failed. Please try again.", "danger")
 
-        return jsonify({"success": True}), 200
+        if request.is_json:
+            return jsonify({"success": True}), 200
+        else:
+            flash("Activity submitted successfully!", "success")
+            return redirect(url_for("messages", id=id))
 
+    # GET — show messages
     all_messages = list(db.messages.find({"competition_id": id}).sort("timestamp", 1))
     return render_template("messages.html", messages=all_messages, competition_id=id)
 
+
+@app.route("/submit_activity", methods=["POST"])
+@login_required
+def submit_activity():
+    user_id = request.form.get("user_id")
+    competition_id = request.form.get("competition_id")
+    activity_data = request.form.get("activity_data")
+
+    if not all([user_id, competition_id, activity_data]):
+        flash("Missing information. Please fill all fields.", "danger")
+        return redirect(url_for("user_dashboard"))
+
+    # Prepare payload for validation agent
+    payload = {
+        "user_id": user_id,
+        "activity_data": activity_data,
+        "competition_id": competition_id
+    }
+
+    try:
+        validation_response = requests.post("http://127.0.0.1:5005/api/submit", json=payload)
+        validation_response.raise_for_status()
+        result = validation_response.json()
+        flash("Activity submitted successfully!", "success")
+    except requests.exceptions.RequestException as e:
+        flash(f"Error sending data to validation service: {e}", "danger")
+
+    return redirect(url_for("user_dashboard"))
 
 # -------------------
 # RUN APP
 # -------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=5000)

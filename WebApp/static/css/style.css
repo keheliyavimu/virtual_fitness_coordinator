@@ -205,3 +205,8 @@ body {
 .message-list li { padding: 8px 0; border-bottom: 1px solid #E5E7EB; }
 .msg-time { color: #6B7280; font-size: 0.85rem; margin-left: 8px; }
 
+.feedback-message {
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
