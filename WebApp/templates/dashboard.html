@@ -107,7 +107,7 @@
                   class="activity-form"
                   data-competition-id="{{ competition['_id'] }}">
               
-              <input type="hidden" name="user_id" value="{{ current_user.id }}">
+              <input type="hidden" name="user_id" value="{{ current_user.username }}">
               <input type="hidden" name="competition_id" value="{{ competition['_id'] }}">
 
               <label for="activity_{{ competition['_id'] }}">Enter Activity:</label>

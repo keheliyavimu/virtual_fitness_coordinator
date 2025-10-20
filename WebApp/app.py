@@ -14,6 +14,11 @@ load_dotenv()
 
 # --- Flask App Setup ---
 app = Flask(__name__)
+
+@app.context_processor
+def inject_current_year():
+    return {'current_year': datetime.now().year}
+
 app.secret_key = os.getenv("SECRET_KEY")
 
 # --- Initialize Extensions ---
@@ -221,15 +226,29 @@ def leaderboard_page(competition_id):
         response = requests.get(f"{LEADERBOARD_API}/{competition_id}")
         print(f"↩️ Status: {response.status_code}, Response: {response.text}")
 
+        leaderboard_data = []
         if response.status_code == 200:
-            data = response.json().get("leaderboard", [])
-            return render_template("leaderboard.html", leaderboard=data)
+            data = response.json()
+            leaderboard_data = data.get("leaderboard", [])
         else:
             print(f"⚠️ Failed to fetch leaderboard. Status code: {response.status_code}")
-            return render_template("leaderboard.html", leaderboard=[])
+
+        # ✅ Sort leaderboard in descending order by score
+        leaderboard_data.sort(key=lambda x: x.get("score", 0), reverse=True)
+
+        # ✅ Get top score for scaling the bars
+        top_score = leaderboard_data[0]["score"] if leaderboard_data else 1
+
+        return render_template(
+            "leaderboard.html",
+            leaderboard=leaderboard_data,
+            top_score=top_score
+        )
+
     except Exception as e:
         print(f"❌ Error fetching leaderboard: {e}")
-        return render_template("leaderboard.html", leaderboard=[])
+        return render_template("leaderboard.html", leaderboard=[], top_score=1)
+
 
 
 @app.route("/messages/<id>", methods=["GET", "POST"])
