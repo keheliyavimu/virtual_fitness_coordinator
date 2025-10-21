@@ -1,50 +1,82 @@
-# Virtual Fitness Competition Coordinator
 
-A multi-agent AI system designed to automate the workflow of virtual fitness challenges. It handles participant data ingestion, validation, score calculation, and real-time leaderboard management.
+Each agent communicates securely over HTTP using API keys stored in `.env` files.  
+All agents are isolated and can be deployed or scaled independently.
 
-## 🏗 System Architecture
+---
 
-The system is composed of three independent microservices (agents) that communicate via HTTP REST APIs:
+## 🧰 Technologies Used
 
-1.  *Validation Agent (Port 5000):* The entry point. Sanitizes and validates all incoming data.
-2.  *Score Calculator Agent (Port 5002):* Appoints rules and calculates scores for activities.
-3.  *Leaderboard Manager Agent (Port 5001):* Maintains the competition state and serves leaderboard data.
+| Category | Tools / Libraries |
+|-----------|------------------|
+| **Framework** | Flask |
+| **Database** | MongoDB (pymongo) |
+| **NLP** | spaCy (NER for entity extraction) |
+| **LLM** | Google Gemini / OpenAI GPT |
+| **Security** | dotenv, API keys, input sanitization |
+| **Communication** | REST APIs (HTTP, JSON) |
+| **Responsible AI** | Explainability logs, user data privacy, fairness policies |
 
-## 🚀 How to Run
+---
 
-1.  *Clone the repository:*
-    bash
-    git clone https://github.com/your-username/your-repository-name.git
-    cd your-repository-name
-    
+## 🧠 Responsible AI Implementation
 
-2.  *Set up each agent* (Repeat for each agent folder: agent_validation, agent_calculator, agent_leaderboard):
-    bash
-    # Navigate to the agent folder
-    cd agent_validation
+- **Fairness:** Same scoring logic applied for all participants.  
+- **Explainability:** Every AI-generated score includes a natural language explanation.  
+- **Transparency:** Logs include all reasoning and intermediate outputs.  
+- **Data Protection:** No personal or sensitive data stored.  
+- **Accountability:** Decisions traceable through reasoning logs.
 
-    # Create and activate a virtual environment
-    python -m venv venv
-    source venv/bin/activate  # On Windows: venv\Scripts\activate
+---
 
-    # Install dependencies
-    pip install flask requests
+## 🧩 Agent Responsibilities
 
-    # Run the agent
-    python app.py
-    
+### 🧹 Validation Agent (Port 5000)
+- First point of contact for incoming user data.  
+- Performs input validation and sanitization.  
+- Uses authentication (API key).  
+- Forwards valid data to the Score Calculator Agent.
 
-3.  *Run all agents:* Each agent must be run in a separate terminal. They run on ports 5000, 5002, and 5001 respectively.
+### 🧮 Score Calculator Agent (Port 5002)
+- Uses **spaCy** to extract quantitative values (e.g., steps, distance, time).  
+- Uses **LLM (Gemini or GPT)** for contextual reasoning.  
+- Generates:
+  - **Score value**
+  - **AI explanation**
+- Sends output securely to the Leaderboard Agent.
 
-## 📡 API Usage
+### 🏆 Leaderboard Manager Agent (Port 5001)
+- Maintains scores in MongoDB.  
+- Aggregates user totals by competition.  
+- Serves leaderboard data via REST endpoint.  
+- Enforces authentication for data updates.
 
--   *Submit Activity:* POST http://localhost:5000/api/submit
-    json
-    {"user_id": "user123", "activity_data": "steps: 10000"}
-    
--   *Get Leaderboard:* GET http://localhost:5001/api/leaderboard
+---
 
-## 👥 Contributors
+## 🔒 Security Features
 
--   [Chathuranga K.K.K.V.](https://github.com/keheliyavimu)
--   [Senaratne H.S.](https://github.com/HSSenaratne)  
+- ✅ API key authentication across agents  
+- ✅ Input sanitization & validation  
+- ✅ `.env` secrets management  
+- ✅ Separate microservices (principle of least privilege)  
+- ✅ Logging & reasoning transparency  
+
+---
+
+## 🧠 NLP + LLM Integration
+
+| Function | Example |
+|-----------|----------|
+| **Input Parsing** | “Walked around 6000 steps today” → steps = 6000 |
+| **LLM Scoring Logic** | “Score is based on 6000 steps, where every 1000 steps = 1 point.” |
+| **Explainability Output** | Stored as `ai_reason` in MongoDB for human-readable justification |
+
+---
+
+## ⚙️ Example Workflow
+
+### **1️⃣ User Submission**
+```json
+{
+  "user_id": "harindu",
+  "activity_data": "Walked 6000 steps today after lunch."
+}
