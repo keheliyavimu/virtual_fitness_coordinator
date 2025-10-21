@@ -39,6 +39,7 @@
           <tr>
             <th>Name</th>
             <th>Description</th>
+            <th>Enrolled Users</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -47,11 +48,28 @@
           <tr>
             <td>{{ competition.name }}</td>
             <td>{{ competition.description }}</td>
+            
+            <!-- Dropdown for Enrolled Users -->
             <td>
+              {% set enrolled_users = competition.enrolled_users or [] %}
+              {% if enrolled_users %}
+                <select class="dropdown-users">
+                  <option disabled selected>View Enrolled Users</option>
+                  {% for user in enrolled_users %}
+                    <option>{{ user }}</option>
+                  {% endfor %}
+                </select>
+              {% else %}
+                <span class="no-users">No users enrolled</span>
+              {% endif %}
+            </td>
+
+            <td class="action-buttons">
               <a href="{{ url_for('edit_competition', id=competition['_id']) }}" class="btn btn-edit">Edit</a>
               <form method="POST" action="{{ url_for('delete_competition', id=competition['_id']) }}" class="inline-form">
                 <button type="submit" class="btn btn-delete">Delete</button>
               </form>
+              <a href="{{ url_for('leaderboard_page', competition_id=competition['_id']) }}" class="btn btn-leaderboard">🏆 View Leaderboard</a>
             </td>
           </tr>
           {% endfor %}

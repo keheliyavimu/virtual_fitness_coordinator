@@ -8,12 +8,12 @@ from datetime import datetime
 import os
 import requests
 
+# -------------------
+# CONFIG
+# -------------------
 LEADERBOARD_API = "http://127.0.0.1:5001/api/leaderboard"
-
-# --- Load environment variables ---
 load_dotenv()
 
-# --- Flask App Setup ---
 app = Flask(__name__)
 
 @app.context_processor
@@ -22,24 +22,25 @@ def inject_current_year():
 
 app.secret_key = os.getenv("SECRET_KEY")
 
-# --- Initialize Extensions ---
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
-# --- MongoDB Setup ---
 client = MongoClient(os.getenv("MONGO_URI"))
 db = client["webappdb"]
 
-# --- API Key for Validation Agent ---
 AGENT_API_KEY = os.getenv("AGENT_API_KEY")
 
-# --- User Model ---
+
+# -------------------
+# USER MODEL
+# -------------------
 class User(UserMixin):
     def __init__(self, user_doc):
         self.id = str(user_doc["_id"])
         self.username = user_doc["username"]
         self.role = user_doc.get("role", "user")
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -49,8 +50,9 @@ def load_user(user_id):
     except Exception:
         return None
 
+
 # -------------------
-# ROUTES
+# HOME
 # -------------------
 @app.route("/")
 def home():
@@ -60,6 +62,7 @@ def home():
         else:
             return redirect(url_for("user_dashboard"))
     return redirect(url_for("login"))
+
 
 # -------------------
 # AUTH ROUTES
@@ -86,6 +89,7 @@ def register():
         return redirect(url_for("login"))
     return render_template("register.html")
 
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -104,6 +108,7 @@ def login():
             flash("Invalid credentials", "danger")
     return render_template("login.html")
 
+
 @app.route("/logout")
 @login_required
 def logout():
@@ -111,8 +116,9 @@ def logout():
     flash("Logged out successfully", "info")
     return redirect(url_for("login"))
 
+
 # -------------------
-# ADMIN ROUTES
+# ADMIN DASHBOARD
 # -------------------
 @app.route("/admin/dashboard")
 @login_required
@@ -123,9 +129,26 @@ def admin_dashboard():
 
     users = list(db.users.find())
     competitions = list(db.competitions.find())
+
     for comp in competitions:
         comp["_id"] = str(comp["_id"])
+        enrollments = list(db.enrollments.find({"competition_id": comp["_id"]}))
+        enrolled_usernames = []
+        for enr in enrollments:
+            # Use stored username if available; fallback to user lookup
+            if enr.get("username"):
+                enrolled_usernames.append(enr["username"])
+            else:
+                try:
+                    udoc = db.users.find_one({"_id": ObjectId(enr["user_id"])})
+                    if udoc:
+                        enrolled_usernames.append(udoc["username"])
+                except Exception:
+                    continue
+        comp["enrolled_users"] = enrolled_usernames
+
     return render_template("dashboard.html", users=users, competitions=competitions, role="admin")
+
 
 @app.route("/competition/new", methods=["GET", "POST"])
 @login_required
@@ -142,6 +165,7 @@ def competition_form():
         return redirect(url_for("admin_dashboard"))
 
     return render_template("competition_form.html", competition=None)
+
 
 @app.route("/competition/edit/<id>", methods=["GET", "POST"])
 @login_required
@@ -163,6 +187,7 @@ def edit_competition(id):
 
     return render_template("competition_form.html", competition=competition)
 
+
 @app.route("/competition/<id>/delete", methods=["POST"])
 @login_required
 def delete_competition(id):
@@ -174,12 +199,16 @@ def delete_competition(id):
     flash("Competition deleted", "info")
     return redirect(url_for("admin_dashboard"))
 
+
 # -------------------
-# USER ROUTES
+# USER DASHBOARD
 # -------------------
 @app.route("/user/dashboard")
 @login_required
 def user_dashboard():
+    if current_user.role == "admin":
+        return redirect(url_for("admin_dashboard"))
+
     competitions = list(db.competitions.find())
     for comp in competitions:
         comp["_id"] = str(comp["_id"])
@@ -197,23 +226,38 @@ def user_dashboard():
         except Exception:
             continue
 
-    return render_template("dashboard.html", competitions=competitions, enrolled_ids=enrolled_ids,
-                           enrolled_competitions=enrolled_competitions, role="user")
+    return render_template(
+        "dashboard.html",
+        competitions=competitions,
+        enrolled_ids=enrolled_ids,
+        enrolled_competitions=enrolled_competitions,
+        role="user"
+    )
+
 
 @app.route("/competition/<competition_id>/enroll", methods=["POST"])
 @login_required
 def enroll_competition(competition_id):
-    if db.enrollments.find_one({"user_id": current_user.id, "competition_id": competition_id}):
+    comp_id_str = str(competition_id)
+
+    existing = db.enrollments.find_one({
+        "user_id": current_user.id,
+        "competition_id": comp_id_str
+    })
+    if existing:
         flash("Already enrolled", "warning")
         return redirect(url_for("user_dashboard"))
 
     db.enrollments.insert_one({
         "user_id": current_user.id,
-        "competition_id": competition_id,
+        "username": current_user.username,
+        "competition_id": comp_id_str,
         "enrolled_at": datetime.utcnow()
     })
+
     flash("Enrolled successfully!", "success")
     return redirect(url_for("user_dashboard"))
+
 
 # -------------------
 # MESSAGES & LEADERBOARD
@@ -241,6 +285,7 @@ def leaderboard_page(competition_id):
     except Exception as e:
         print(f"❌ Error fetching leaderboard: {e}")
         return render_template("leaderboard.html", leaderboard=[], top_score=1)
+
 
 @app.route("/messages/<id>", methods=["GET", "POST"])
 @login_required
@@ -275,7 +320,6 @@ def messages(id):
             "activity_data": msg,
             "competition_id": id
         }
-
         headers = {"X-API-Key": AGENT_API_KEY}
 
         try:
@@ -294,6 +338,7 @@ def messages(id):
     all_messages = list(db.messages.find({"competition_id": id}).sort("timestamp", 1))
     return render_template("messages.html", messages=all_messages, competition_id=id)
 
+
 @app.route("/submit_activity", methods=["POST"])
 @login_required
 def submit_activity():
@@ -310,18 +355,17 @@ def submit_activity():
         "activity_data": activity_data,
         "competition_id": competition_id
     }
-
     headers = {"X-API-Key": AGENT_API_KEY}
 
     try:
         validation_response = requests.post("http://127.0.0.1:5005/api/submit", json=payload, headers=headers)
         validation_response.raise_for_status()
-        result = validation_response.json()
         flash("Activity submitted successfully!", "success")
     except requests.exceptions.RequestException as e:
         flash(f"Error sending data to validation service: {e}", "danger")
 
     return redirect(url_for("user_dashboard"))
+
 
 # -------------------
 # RUN APP

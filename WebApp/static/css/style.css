@@ -255,3 +255,39 @@ input:focus, textarea:focus {
 .card, .competition-card, .leaderboard-card {
   animation: fadeInUp 0.6s ease forwards;
 }
+
+.dropdown-users {
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: #fafafa;
+}
+
+.dropdown-users:hover {
+  background-color: #f0f0f0;
+}
+
+.no-users {
+  color: #999;
+  font-style: italic;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-leaderboard {
+  background-color: #1d4ed8;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.btn-leaderboard:hover {
+  background-color: #2563eb;
+}
