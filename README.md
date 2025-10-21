@@ -1,3 +1,19 @@
+# 🧠 Virtual Fitness Competition Coordinator
+
+An **AI-powered multi-agent system** that automates virtual fitness challenges — from participant input to scoring and live leaderboard updates.  
+This system demonstrates a modular, secure, and ethical implementation of **multi-agent collaboration**, **NLP reasoning**, and **Responsible AI** principles.
+
+---
+
+## ⚙️ System Overview
+
+The project is built using a **multi-agent architecture** where each agent acts as an independent microservice communicating via REST APIs.  
+
+| Agent | Role | Port | Key Features |
+|--------|------|------|---------------|
+| 🧩 **Validation Agent** | Entry point – validates, sanitizes, and routes user submissions. | `5000` | Input sanitization, authentication, secure routing |
+| 🧮 **Score Calculator Agent** | Parses user activity using NLP and LLM reasoning, then assigns a score. | `5002` | Uses spaCy (NER) + Google Gemini (LLM) for context-aware scoring |
+| 🏆 **Leaderboard Manager Agent** | Maintains leaderboard data and exposes ranking APIs. | `5001` | MongoDB persistence, competition aggregation, secure updates |
 
 Each agent communicates securely over HTTP using API keys stored in `.env` files.  
 All agents are isolated and can be deployed or scaled independently.
@@ -72,11 +88,13 @@ All agents are isolated and can be deployed or scaled independently.
 
 ---
 
-## ⚙️ Example Workflow
+## ⚙️ Workflow Overview
 
-### **1️⃣ User Submission**
-```json
-{
-  "user_id": "harindu",
-  "activity_data": "Walked 6000 steps today after lunch."
-}
+### **2️⃣ Validation Agent**
+- Sanitizes input  
+- Checks authentication  
+- Routes to Score Calculator Agent
+
+## 👥 Contributors 
+- [Chathuranga K.K.K.V.](https://github.com/keheliyavimu) 
+- [Senaratne H.S.](https://github.com/HSSenaratne)
