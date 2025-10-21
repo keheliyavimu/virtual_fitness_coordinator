@@ -9,6 +9,7 @@ import os
 import requests
 
 LEADERBOARD_API = "http://127.0.0.1:5001/api/leaderboard"
+
 # --- Load environment variables ---
 load_dotenv()
 
@@ -29,6 +30,9 @@ login_manager.login_view = "login"
 # --- MongoDB Setup ---
 client = MongoClient(os.getenv("MONGO_URI"))
 db = client["webappdb"]
+
+# --- API Key for Validation Agent ---
+AGENT_API_KEY = os.getenv("AGENT_API_KEY")
 
 # --- User Model ---
 class User(UserMixin):
@@ -117,7 +121,6 @@ def admin_dashboard():
         flash("Access denied", "danger")
         return redirect(url_for("user_dashboard"))
 
-    # convert _id to string for template usage
     users = list(db.users.find())
     competitions = list(db.competitions.find())
     for comp in competitions:
@@ -178,14 +181,12 @@ def delete_competition(id):
 @login_required
 def user_dashboard():
     competitions = list(db.competitions.find())
-    # convert competition _id to string for template
     for comp in competitions:
         comp["_id"] = str(comp["_id"])
 
     enrolled = list(db.enrollments.find({"user_id": current_user.id}))
     enrolled_ids = [e["competition_id"] for e in enrolled]
 
-    # get competition docs for enrolled_ids, filter None
     enrolled_competitions = []
     for cid in enrolled_ids:
         try:
@@ -194,7 +195,6 @@ def user_dashboard():
                 comp_doc["_id"] = str(comp_doc["_id"])
                 enrolled_competitions.append(comp_doc)
         except Exception:
-            # skip invalid ids
             continue
 
     return render_template("dashboard.html", competitions=competitions, enrolled_ids=enrolled_ids,
@@ -233,35 +233,24 @@ def leaderboard_page(competition_id):
         else:
             print(f"⚠️ Failed to fetch leaderboard. Status code: {response.status_code}")
 
-        # ✅ Sort leaderboard in descending order by score
         leaderboard_data.sort(key=lambda x: x.get("score", 0), reverse=True)
-
-        # ✅ Get top score for scaling the bars
         top_score = leaderboard_data[0]["score"] if leaderboard_data else 1
 
-        return render_template(
-            "leaderboard.html",
-            leaderboard=leaderboard_data,
-            top_score=top_score
-        )
+        return render_template("leaderboard.html", leaderboard=leaderboard_data, top_score=top_score)
 
     except Exception as e:
         print(f"❌ Error fetching leaderboard: {e}")
         return render_template("leaderboard.html", leaderboard=[], top_score=1)
 
-
-
 @app.route("/messages/<id>", methods=["GET", "POST"])
 @login_required
 def messages(id):
-    # Check if user is allowed
     enrollment = db.enrollments.find_one({"user_id": current_user.id, "competition_id": id})
     if not enrollment and current_user.role != "admin":
         flash("Access denied", "danger")
         return redirect(url_for("user_dashboard"))
 
     if request.method == "POST":
-        # Handle both JSON and form submissions
         if request.is_json:
             data = request.get_json()
             msg = data.get("message")
@@ -273,7 +262,6 @@ def messages(id):
         if not msg:
             return jsonify({"error": "Message cannot be empty."}), 400
 
-        # Save message
         db.messages.insert_one({
             "competition_id": id,
             "user_id": user_id,
@@ -282,15 +270,16 @@ def messages(id):
             "timestamp": datetime.utcnow()
         })
 
-        # Forward to Validation Agent
         validation_payload = {
             "user_id": user_id,
             "activity_data": msg,
             "competition_id": id
         }
 
+        headers = {"X-API-Key": AGENT_API_KEY}
+
         try:
-            val_response = requests.post("http://127.0.0.1:5005/api/submit", json=validation_payload)
+            val_response = requests.post("http://127.0.0.1:5005/api/submit", json=validation_payload, headers=headers)
             val_response.raise_for_status()
         except requests.exceptions.RequestException as e:
             print(f"❌ Validation failed: {e}")
@@ -302,10 +291,8 @@ def messages(id):
             flash("Activity submitted successfully!", "success")
             return redirect(url_for("messages", id=id))
 
-    # GET — show messages
     all_messages = list(db.messages.find({"competition_id": id}).sort("timestamp", 1))
     return render_template("messages.html", messages=all_messages, competition_id=id)
-
 
 @app.route("/submit_activity", methods=["POST"])
 @login_required
@@ -318,15 +305,16 @@ def submit_activity():
         flash("Missing information. Please fill all fields.", "danger")
         return redirect(url_for("user_dashboard"))
 
-    # Prepare payload for validation agent
     payload = {
         "user_id": user_id,
         "activity_data": activity_data,
         "competition_id": competition_id
     }
 
+    headers = {"X-API-Key": AGENT_API_KEY}
+
     try:
-        validation_response = requests.post("http://127.0.0.1:5005/api/submit", json=payload)
+        validation_response = requests.post("http://127.0.0.1:5005/api/submit", json=payload, headers=headers)
         validation_response.raise_for_status()
         result = validation_response.json()
         flash("Activity submitted successfully!", "success")
